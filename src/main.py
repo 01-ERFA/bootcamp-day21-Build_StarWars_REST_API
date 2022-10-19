@@ -92,10 +92,9 @@ def get_favorites(user_id):
 def post_favorites(user_id):
 
     body = json.loads(request.data)
-    print(body["favorite"])
+    
     favorites_user = Favorites.query.filter_by(id = user_id).first()
-    print(dict(favorites_user.serialize())["list_favorites"])
-    print(body["favorite"] in dict(favorites_user.serialize())["list_favorites"])
+    
 
     # borrar si ya esta en la lista 
     if body["favorite"] in dict(favorites_user.serialize())["list_favorites"]:
