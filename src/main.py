@@ -54,10 +54,10 @@ def create_user():
     favorites_user = Favorites.query.first()
     # si el email ingresado no existe en la tabla, crea al nuevo usuario
     if query_user is None:
-        new_user = User(email=body["email"], password=body["password"], name=body["name"], is_active=bool(body["is_active"]))
+        new_user = User(email=body["email"], password=body["password"], name=body["name"], is_active=bool(body["is_active"]), id=len(User.query.all())+1)
         db.session.add(new_user)
         db.session.commit()
-        new_table_favorite = Favorites(list_favorites="")
+        new_table_favorite = Favorites(list_favorites="", id=len(Favorites.query.all())+1)
         db.session.add(new_table_favorite)
         db.session.commit()
         # mensaje que vuelve al front
@@ -83,25 +83,30 @@ def get_favorites(user_id):
         }
         return jsonify(obj), 404
     obj = {
-        "list_favorites": dict(favorites_user.serialize())["list_favorites"].split(",")
+        "list_favorites": dict(favorites_user.serialize())["list_favorites"].split("$$")
     }
     return jsonify(obj), 200
 
-# los favoritos - ¡¡PUT!!    + AGREGA y BORRA segun reciba el objeto del front... el objeto debe contener un "favorite": "el favorito" unicamente. 
+# los favoritos - ¡¡PUT!!    + AGREGA y BORRA segun reciba el objeto del front... el objeto debe ser así {"favorite": "el favorito"} unicamente. 
 @app.route('/user/<int:user_id>/favorites', methods=['PUT'])
 def post_favorites(user_id):
 
     body = json.loads(request.data)
     
+    
     favorites_user = Favorites.query.filter_by(id = user_id).first()
     
-
+    if favorites_user is None:
+        obj = {
+            "msg": "error; the user does not exist"
+        }
+        return jsonify(obj), 404
     # borrar si ya esta en la lista 
-    if body["favorite"] in dict(favorites_user.serialize())["list_favorites"]:
+    elif body["favorite"] in dict(favorites_user.serialize())["list_favorites"]:
         # conseguimos el str de la base de datos
         aux = dict(favorites_user.serialize())["list_favorites"]
         # eliminamos el valor usandolo de referencia de separación para crear un array
-        aux = aux.split(","+body["favorite"])
+        aux = aux.split("$$"+body["favorite"])
         # convertimos el array sin el valor de vuelta en str, para mandarlo a la base de datos
         aux = ''.join(aux)
         favorites_user.list_favorites = aux
@@ -112,7 +117,7 @@ def post_favorites(user_id):
         return jsonify({"msg": "There is no list for this user"}), 404
 
     # agregar si existe la lista pero no esta el contenido. 
-    favorites_user.list_favorites = dict(favorites_user.serialize())["list_favorites"]+","+body["favorite"]
+    favorites_user.list_favorites = dict(favorites_user.serialize())["list_favorites"]+"$$"+body["favorite"]
     db.session.commit()
     return jsonify({"msg": "the favorite has been added successfully"})
 
