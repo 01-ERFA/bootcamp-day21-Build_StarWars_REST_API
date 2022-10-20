@@ -11,6 +11,11 @@ from admin import setup_admin
 from models import db, User, Planet, Character, Film, Favorites
 #from models import Person
 
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
+
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DB_CONNECTION_STRING')
@@ -19,6 +24,51 @@ MIGRATE = Migrate(app, db)
 db.init_app(app)
 CORS(app)
 setup_admin(app)
+
+# Setup the Flask-JWT-Extended extension
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+jwt = JWTManager(app)
+
+# Create a route to authenticate your users and return JWTs. The
+# create_access_token() function is used to actually generate the JWT.
+@app.route("/login", methods=["POST"])
+def login():
+
+    # consigue los datos del objeto del front
+    email = request.json.get("email", None)
+    password = request.json.get("password", None)
+
+    user = User.query.filter_by(email=email).first()
+
+    if user is None:
+        return jsonify({"msg": "Bad email or password"}), 401
+    elif email != user.email or password != user.password:
+        return jsonify({"msg": "Bad email or password"}), 401
+
+    # retorna un token
+    access_token = create_access_token(identity=email)
+    return jsonify({"user": {"id":str(user.id), "email": email}, "access_token":access_token})
+
+# Protect a route with jwt_required, which will kick out requests
+# without a valid JWT present.
+@app.route("/profile", methods=["GET"])
+@jwt_required() # el portero
+def protected():
+    # Access the identity of the current user with get_jwt_identity
+
+    current_user = get_jwt_identity()
+    user = User.query.filter_by(email=current_user).first()
+
+    if user is None:
+        return jsonify({"msg": "Bad email or password"}), 401
+
+    response_body = {
+        "name": str(user.name),
+        "email": str(user.email),
+        "id": str(user.id)
+    }
+
+    return jsonify(response_body), 200
 
 # Handle/serialize errors like a JSON object
 @app.errorhandler(APIException)
@@ -121,7 +171,7 @@ def post_favorites(user_id):
     db.session.commit()
     return jsonify({"msg": "the favorite has been added successfully"})
 
-
+# ver a los planetas - GET
 @app.route('/planets', methods=['GET'])
 def get_planets_all():
     all_planets = Planet.query.all()
@@ -138,8 +188,48 @@ def get_planet(planet_id):
         return jsonify(obj), 404
 
     return jsonify(planet.serialize())
+
+# crear un planeta - POST
+@app.route('/planets', methods=['POST'])
+def create_planet():
+
+    body = json.loads(request.data)
+
+    query_planet = Planet.query.filter_by(name=body["name"]).first()
+
+
+    if query_planet is None:
+        new_planet = Planet(name=body["name"], id=len(User.query.all())+1, population=body["population"], rotation_period=body["rotation_period"], orbital_period=body["orbital_period"], diameter=body["diameter"], gravity=body["gravity"], terrain_grasslands=body["terrain_grasslands"], surface_water=body["surface_water"], climate=body["climate"])
+        db.session.add(new_planet)
+        db.session.commit()
+
+        return jsonify({"msg": "created planet"})
  
-@app.route('/characters', methods=['GET'])
+    return jsonify({"msg": "existed planet"})
+
+# eliminar un planeta - DELETE
+@app.route('/planets', methods=['DELETE'])
+def delete_planet():
+
+    body = json.loads(request.data)
+    print(body)
+    # si el cuerpo no esta vacio
+    if body is not None:
+        key = "name"
+        # si existe la propiedad "name" dentro del body
+        if key in body:
+            # hacemos la consulta a la tabla
+            query_planet = Planet.query.filter_by(name=body["name"]).first()
+            # si existe esa columna con ese "name"
+            if query_planet is not None:
+                # elimina dicha columna
+                db.session.delete(query_planet)
+                db.session.commit()
+                return jsonify({"msg": "the planet was removed"}), 200
+    #sino llega a pasar alguna de las condiciones anteriores, es porque ese planeta no esta en la tabla. 
+    return jsonify({"msg": "planet not found"}), 404
+ 
+@app.route('/characters', methods=['GET']) 
 def get_characters_all():
     all_characters = Character.query.all()
     results = list(map(lambda item: item.serialize(), all_characters))
