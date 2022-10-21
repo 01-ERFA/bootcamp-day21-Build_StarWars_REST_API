@@ -32,7 +32,7 @@ jwt = JWTManager(app)
 # Create a route to authenticate your users and return JWTs. The
 # create_access_token() function is used to actually generate the JWT.
 @app.route("/login", methods=["POST"])
-def login():
+def login():   
 
     # consigue los datos del objeto del front
     email = request.json.get("email", None)
