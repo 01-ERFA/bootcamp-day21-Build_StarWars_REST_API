@@ -28,7 +28,7 @@ setup_admin(app)
 # Setup the Flask-JWT-Extended extension
 app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
 jwt = JWTManager(app)
-
+ 
 # Create a route to authenticate your users and return JWTs. The
 # create_access_token() function is used to actually generate the JWT.
 @app.route("/login", methods=["POST"])
@@ -68,6 +68,24 @@ def protected():
         "id": str(user.id)
     }
 
+    return jsonify(response_body), 200
+
+@app.route("/valid-token", methods=["GET"])
+@jwt_required()
+def valid_token():  
+    
+    current_user = get_jwt_identity()
+    login_user = User.query.filter_by(email=current_user).first()
+    if login_user is None:
+        return jsonify({"status": False}), 404
+    response_body={
+        "status": True,
+        "user":{
+            "name": str(login_user.name),
+            "email": str(login_user.email),
+            "id": str(login_user.id)
+        }
+    }
     return jsonify(response_body), 200
 
 # Handle/serialize errors like a JSON object
